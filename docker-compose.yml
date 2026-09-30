@@ -1,0 +1,9 @@
+services:
+  depot-db:
+    image: mysql:8.0
+    restart: always
+    ports:
+      - "3309:3306" # Pindahkan dari 3307 ke 3309
+    environment:
+      MYSQL_ROOT_PASSWORD: password123
+      MYSQL_DATABASE: depot_db

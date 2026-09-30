@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// --- MODUL ABSENSI & GAJI (DIPERBAIKI) ---
+
+model pegawai {
+  id                  Int               @id @default(autoincrement())
+  nama_pegawai        String            @db.VarChar(100)
+  jabatan             String?            @db.VarChar(100)
+  no_hp               String?           @db.VarChar(20)
+  alamat              String?           @db.Text
+  status_aktif        String?           @default("Aktif") @db.VarChar(20)
+  tanggal_mulai_kerja DateTime?         @db.Date
+  gaji_harian         Int               @default(0)
+  created_at          DateTime          @default(now()) @db.Timestamp(0)
+
+  // Relasi
+  absensi             absensi_pegawai[]
+  rekap_gaji          rekap_gaji[]
+}
+
+model absensi_pegawai {
+  id              Int      @id @default(autoincrement())
+  pegawai_id      Int
+  tanggal         DateTime @db.Date
+  hari            String   @db.VarChar(20)
+  masuk_kerja     Int?     @default(1)
+  setengah_hari   Int?     @default(0)
+  created_at      DateTime @default(now()) @db.Timestamp(0)
+
+  pegawai         pegawai  @relation(fields: [pegawai_id], references: [id])
+
+  // TAMBAHKAN INI agar tidak bisa input 2x untuk pegawai yang sama di tanggal yang sama
+  @@unique([pegawai_id, tanggal]) 
+  @@index([pegawai_id], map: "pegawai_id")
+}
+
+model rekap_gaji {
+  id                  Int      @id @default(autoincrement())
+  pegawai_id          Int
+  periode_awal        DateTime @db.Date
+  periode_akhir       DateTime @db.Date
+  total_hari_masuk    Int?     @default(0)
+  total_setengah_hari Int?     @default(0)
+  bonus               Int?     @default(0)
+  total_gaji          BigInt?  @default(0)
+  tanggal_rekap       DateTime @default(now()) @db.Timestamp(0)
+  total_akhir         Int?     @default(0)
+
+  pegawai             pegawai  @relation(fields: [pegawai_id], references: [id])
+
+  // TAMBAHKAN INI agar rekap tidak duplikat untuk periode yang sama
+  @@unique([pegawai_id, periode_awal, periode_akhir])
+  @@index([pegawai_id], map: "pegawai_id")
+}
+
+// --- MODUL TRANSAKSI ---
+
+model transaksi {
+  id                 String             @id @default(cuid()) // Tipe data diubah menjadi String
+  tanggal            DateTime           @db.Date
+  pelanggan_id       Int?
+  nama_pelanggan     String?            @db.VarChar(200)
+  total_harga        Int?
+  bonus              String?            @db.VarChar(100)
+  
+  // Status menggunakan Enum
+  status             StatusTransaksi    @default(PENDING_ASSIGN)
+
+  // Field tambahan untuk sinkronisasi dengan kode web lama
+  status_verifikasi  String?          @db.VarChar(50)
+  
+  // Field untuk galon kembali per jenis
+  galon_kembali      Json?              // Bisa simpan format: {"Aqua": 2, "Keran": 1}
+
+  diverifikasi_oleh  String?            @db.VarChar(100)
+  tanggal_verifikasi DateTime?          @db.DateTime(0)
+  kurir_id           String?            @db.VarChar(100)
+  
+  kurir              User?              @relation(fields: [kurir_id], references: [id])
+  details            detail_transaksi[]
+  pelanggan          pelanggan?         @relation(fields: [pelanggan_id], references: [id])
+
+  @@index([kurir_id], map: "transaksi_kurir_id_fkey")
+  @@index([pelanggan_id], map: "transaksi_pelanggan_id_fkey")
+}
+
+model detail_transaksi {
+  id           Int        @id @default(autoincrement())
+  transaksi_id String?    // Tipe data disamakan menjadi String agar cocok dengan transaksi.id
+  produk       String?    @db.VarChar(100)
+  qty_keluar   Int?
+  qty_kembali  Int?
+  harga        Int?
+  subtotal     Int?
+  bonus        Int        @default(0)
+  
+  transaksi    transaksi? @relation(fields: [transaksi_id], references: [id], onDelete: Cascade)
+
+  @@index([transaksi_id], map: "detail_transaksi_transaksi_id_fkey")
+}
+
+model pelanggan {
+  id              Int         @id @default(autoincrement())
+  jenis           String?     @db.VarChar(50)
+  nama            String?     @db.VarChar(100)
+  alamat          String?     @db.Text
+  wilayah         String?     @db.VarChar(100)
+  no_hp           String?     @db.VarChar(20)
+  saldo_aqua      Int?        @default(0)
+  saldo_keran     Int?        @default(0)
+  saldo_dispenser Int?        @default(0)
+  latitude        Float?   // Tambahkan kolom latitude
+  longitude       Float?   // Tambahkan kolom longitude
+  lokasi_maps     String?     @db.Text
+  transaksi       transaksi[]
+}
+
+// --- MODUL PRODUK & PENGELUARAN ---
+
+model produk {
+  id          Int     @id @default(autoincrement())
+  nama_produk String? @db.VarChar(100)
+  harga       Int?
+}
+
+// Disatukan menjadi satu model untuk konsistensi
+model pengeluaran {
+  id         Int       @id @default(autoincrement())
+  tanggal    DateTime? @db.Date
+  keterangan String?   @db.VarChar(255)
+  nominal    Int?
+}
+
+// --- MODUL USER ---
+
+model User {
+  id        String      @id @default(cuid())
+  name      String?
+  email     String      @unique
+  password  String
+  role      String      @default("user")
+  createdAt DateTime    @default(now())
+  
+  // Tambahkan baris ini
+  transaksi transaksi[] 
+}
+
+model TargetDepot {
+  id              String   @id @default(cuid())
+  target_mingguan01 Int    // Total galon keluar minggu 1
+  target_mingguan02 Int    // Total galon keluar minggu 2
+  updatedAt       DateTime @updatedAt
+}
+
+enum StatusTransaksi {
+  PENDING_ASSIGN
+  ON_DELIVERY
+  WAITING_FOR_RETURN // Status baru setelah kurir klik selesai
+  PENDING_VERIFIKASI
+  COMPLETED
+}

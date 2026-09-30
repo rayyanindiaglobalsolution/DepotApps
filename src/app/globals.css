@@ -1,0 +1,49 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+@layer base {
+  body {
+    background-color: #f8fafc;
+    color: #000000;
+  }
+
+  .card-container {
+    background-color: white;
+    border-radius: 1rem;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    padding: 2rem;
+  }
+}
+
+/* Pengaturan khusus untuk Cetak PDF */
+@media print {
+  /* Menyembunyikan form filter dan form input */
+  form { 
+    display: none !important; 
+  }
+  
+  /* Menyembunyikan tombol cetak */
+  button { 
+    display: none !important; 
+  }
+  
+  /* Membersihkan background dan shadow untuk hasil cetak yang bersih */
+  body { 
+    background: white !important; 
+  }
+  
+  .bg-gray-50\/50 { 
+    background: white !important; 
+  }
+  
+  .border, .shadow-sm { 
+    border: none !important; 
+    box-shadow: none !important; 
+  }
+  
+  /* Memastikan teks tetap terbaca hitam di kertas */
+  .text-gray-500, .text-gray-600 {
+    color: #333333 !important;
+  }
+}
