@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import prisma from "@/lib/prisma";
 import Link from "next/link";
 import ToastHandler from "@/components/ToastHandler";
@@ -10,7 +11,9 @@ export default async function DataPelangganPage() {
 
   return (
     <div className="p-8">
-      <ToastHandler />
+      <Suspense fallback={null}>
+        <ToastHandler />
+      </Suspense>
       
       <div className="flex justify-between items-center mb-6">
         <div>
