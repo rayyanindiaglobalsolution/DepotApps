@@ -3,9 +3,7 @@ import { updatePelanggan } from "@/app/actions/pelanggan";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
-// Update tipe parameter menjadi Promise
 export default async function EditPelangganPage({ params }: { params: Promise<{ id: string }> }) {
-  // Tunggu (await) params sebelum diakses
   const { id: rawId } = await params;
   const id = parseInt(rawId);
   
@@ -15,18 +13,35 @@ export default async function EditPelangganPage({ params }: { params: Promise<{ 
 
   if (!pelanggan) notFound();
 
+  let jenisNormalized = "Rumah Tangga";
+  if (pelanggan.jenis) {
+    const lower = pelanggan.jenis.trim().toLowerCase();
+    if (lower.includes("usaha")) {
+      jenisNormalized = "Usaha";
+    } else if (lower.includes("rumah")) {
+      jenisNormalized = "Rumah Tangga";
+    }
+  }
+
   const updatePelangganWithId = updatePelanggan.bind(null, id);
+
+  // Fungsi pembungkus untuk mengatasi error tipe data action form
+  async function handleSubmit(formData: FormData) {
+    "use server";
+    await updatePelangganWithId(formData);
+  }
 
   return (
     <div className="p-8 max-w-3xl">
       <h1 className="text-2xl font-bold mb-6">Edit Pelanggan</h1>
       
-      <form action={updatePelangganWithId} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+      {/* Gunakan handleSubmit di sini */}
+      <form action={handleSubmit} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-semibold mb-2">Jenis Pelanggan</label>
-            <select name="jenis" defaultValue={pelanggan.jenis || ""} className="w-full p-3 border rounded-xl">
+            <select name="jenis" defaultValue={jenisNormalized} className="w-full p-3 border rounded-xl">
               <option value="Rumah Tangga">Rumah Tangga</option>
               <option value="Usaha">Usaha</option>
             </select>

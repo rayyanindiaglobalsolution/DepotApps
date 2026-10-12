@@ -24,7 +24,10 @@ export async function simpanTransaksi(formData: FormData) {
   const isAdmin = userRole.includes("admin");
   
   const status_verifikasi = isAdmin ? "disetujui" : "pending";
-  const tanggal = new Date();
+  
+  // Mengambil tanggal dari input form (jika kosong, fallback ke tanggal hari ini)
+  const tanggalInput = formData.get("tanggal") as string;
+  const tanggal = tanggalInput ? new Date(tanggalInput) : new Date();
 
   const produkList = [
     { nama: "Aqua", harga: 6000, key: "aqua" },
@@ -53,7 +56,7 @@ export async function simpanTransaksi(formData: FormData) {
           total_harga,
           status_verifikasi,
           diverifikasi_oleh: isAdmin ? userName : null,
-          tanggal_verifikasi: isAdmin ? tanggal : null,
+          tanggal_verifikasi: isAdmin ? new Date() : null,
           details: { create: detailsData },
         } 
       });

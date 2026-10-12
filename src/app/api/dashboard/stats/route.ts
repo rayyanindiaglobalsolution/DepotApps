@@ -14,6 +14,32 @@ export async function GET() {
     _sum: { saldo_aqua: true, saldo_keran: true, saldo_dispenser: true }
   });
 
+  const sumAqua = totalStok._sum.saldo_aqua || 0;
+  const sumKeran = totalStok._sum.saldo_keran || 0;
+  const sumDispenser = totalStok._sum.saldo_dispenser || 0;
+  const totalKeseluruhanGalon = sumAqua + sumKeran + sumDispenser;
+
+  // 1.5 Ambil Stok Depot dari database dan kurangi dengan galon di pelanggan
+  const stokDepotData = await prisma.stokDepot.findMany();
+  
+  let fisikAqua = 0;
+  let fisikKeran = 0;
+  let fisikDispenser = 0;
+
+  stokDepotData.forEach((item) => {
+    const jenis = item.jenis_galon ? item.jenis_galon.toLowerCase() : "";
+    if (jenis === 'aqua') fisikAqua = item.jumlah;
+    if (jenis === 'keran') fisikKeran = item.jumlah;
+    if (jenis === 'dispenser') fisikDispenser = item.jumlah;
+  });
+
+  // Rumus Baru: Jumlah di depot dikurangi jumlah total di pelanggan
+  const stok_depot = {
+    Aqua: fisikAqua - sumAqua,
+    Keran: fisikKeran - sumKeran,
+    Dispenser: fisikDispenser - sumDispenser
+  };
+
   // 2. Transaksi (Minggu Ini & Minggu Lalu)
   const transaksiMingguIni = await prisma.transaksi.findMany({ 
     where: { tanggal: { gte: oneWeekAgo } }, include: { details: true } 
@@ -40,7 +66,13 @@ export async function GET() {
     .sort((a, b) => b.total - a.total).slice(0, 10);
 
   return NextResponse.json({
-    stok_di_pelanggan: totalStok._sum,
+    stok_di_pelanggan: {
+      saldo_aqua: sumAqua,
+      saldo_keran: sumKeran,
+      saldo_dispenser: sumDispenser,
+      total_keseluruhan: totalKeseluruhanGalon
+    },
+    stok_depot: stok_depot, // <-- Data stok depot ditambahkan di sini
     transaksi: {
       rata_rata_minggu_ini: transaksiMingguIni.length / 7,
       rata_rata_galon_keluar_minggu_ini: transaksiMingguIni.reduce((sum, t) => sum + t.details.reduce((s, d) => s + (d.qty_keluar || 0), 0), 0) / 7,

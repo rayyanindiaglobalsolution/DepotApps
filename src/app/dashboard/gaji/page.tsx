@@ -9,25 +9,19 @@ export default function GajiPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   
-  const [targetData, setTargetData] = useState({ mingguan01: '', mingguan02: '' });
   const [bonusData, setBonusData] = useState({ id: '', bonus: 0 });
   const [pegawaiForm, setPegawaiForm] = useState({ nama_pegawai: '', gaji_harian: '', jabatan: '' });
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [resGaji, resPegawai, resTarget] = await Promise.all([
+      const [resGaji, resPegawai] = await Promise.all([
         fetch('/api/gaji').then(res => res.json()),
-        fetch('/api/pegawai').then(res => res.json()),
-        fetch('/api/target').then(res => res.json())
+        fetch('/api/pegawai').then(res => res.json())
       ]);
       
       setDataGaji(resGaji);
       setDataPegawai(resPegawai);
-      setTargetData({ 
-        mingguan01: resTarget.target_mingguan01?.toString() || '', 
-        mingguan02: resTarget.target_mingguan02?.toString() || '' 
-      });
     } catch (error) {
       console.error("Gagal memuat data", error);
     }
@@ -61,28 +55,6 @@ export default function GajiPage() {
     fetchData();
   };
 
-  const handleSimpanTarget = async () => {
-    try {
-      const res = await fetch('/api/target', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mingguan01: targetData.mingguan01,
-          mingguan02: targetData.mingguan02
-        }),
-      });
-      
-      if (res.ok) {
-        alert("Target berhasil disimpan ke database!");
-        fetchData();
-      } else {
-        alert("Gagal menyimpan target.");
-      }
-    } catch (e) {
-      alert("Error koneksi ke server");
-    }
-  };
-
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8 bg-gray-50/50 min-h-screen">
       <div className="flex justify-between items-center">
@@ -91,7 +63,6 @@ export default function GajiPage() {
           <div className="flex gap-6 mt-4 border-b">
             <button onClick={() => setActiveTab('gaji')} className={`pb-2 font-bold ${activeTab === 'gaji' ? 'border-b-2 border-black' : 'text-gray-400'}`}>Rekap Gaji</button>
             <button onClick={() => setActiveTab('karyawan')} className={`pb-2 font-bold ${activeTab === 'karyawan' ? 'border-b-2 border-black' : 'text-gray-400'}`}>Data Karyawan</button>
-            <button onClick={() => setActiveTab('target')} className={`pb-2 font-bold ${activeTab === 'target' ? 'border-b-2 border-black' : 'text-gray-400'}`}>Target Omset</button>
           </div>
         </div>
       </div>
@@ -116,8 +87,11 @@ export default function GajiPage() {
               </thead>
               <tbody className="divide-y text-xs">
                 {dataGaji.map((k: any) => {
-                  const pokok = Number(k.total_akhir || 0);
+                  const totalAkhir = Number(k.total_akhir || 0);
                   const bonus = Number(k.bonus || 0);
+                  // Hitung gaji pokok murni dari total_akhir dikurangi bonus
+                  const gajiPokokMurni = totalAkhir - bonus;
+
                   return (
                     <tr key={k.id}>
                       <td className="p-4 font-bold">{k.pegawai?.nama_pegawai}</td>
@@ -128,9 +102,9 @@ export default function GajiPage() {
                       </td>
                       <td className="p-4 text-center">{k.total_hari_masuk}</td>
                       <td className="p-4 text-center">{k.total_setengah_hari}</td>
-                      <td className="p-4 font-semibold">Rp {pokok.toLocaleString()}</td>
+                      <td className="p-4 font-semibold">Rp {gajiPokokMurni.toLocaleString()}</td>
                       <td className="p-4 text-blue-600 font-bold">Rp {bonus.toLocaleString()}</td>
-                      <td className="p-4 font-black text-emerald-600">Rp {(pokok + bonus).toLocaleString()}</td>
+                      <td className="p-4 font-black text-emerald-600">Rp {totalAkhir.toLocaleString()}</td>
                       <td className="p-4">
                         <button onClick={() => window.open(`/dashboard/gaji/slip/${k.id}`, '_blank')} className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition">Cetak Slip</button>
                       </td>
@@ -162,22 +136,6 @@ export default function GajiPage() {
         </div>
       )}
 
-      {activeTab === 'target' && (
-        <div className="bg-white p-8 rounded-2xl border shadow-sm max-w-xl">
-            <h2 className="text-xl font-bold mb-6">Setting Target Omset Depot</h2>
-            <div className="space-y-4">
-                <div>
-                    <label className="block text-sm font-bold text-gray-600 mb-2">Target Mingguan 01 (Jumlah Galon Keluar)</label>
-                    <input type="number" className="w-full border p-3 rounded-xl" value={targetData.mingguan01} onChange={e => setTargetData({...targetData, mingguan01: e.target.value})} placeholder="Masukkan jumlah target..." />
-                </div>
-                <div>
-                    <label className="block text-sm font-bold text-gray-600 mb-2">Target Mingguan 02 (Jumlah Galon Keluar)</label>
-                    <input type="number" className="w-full border p-3 rounded-xl" value={targetData.mingguan02} onChange={e => setTargetData({...targetData, mingguan02: e.target.value})} placeholder="Masukkan jumlah target..." />
-                </div>
-                <button onClick={handleSimpanTarget} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800">Simpan Target</button>
-            </div>
-        </div>
-      )}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-xl">

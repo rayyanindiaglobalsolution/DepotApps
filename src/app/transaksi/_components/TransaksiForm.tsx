@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { simpanTransaksi } from "../../actions/transaksi";
 
@@ -13,6 +13,21 @@ export default function TransaksiForm({ pelanggan }: { pelanggan: any[] }) {
   const [selectedPelangganId, setSelectedPelangganId] = useState("");
   const [selectedPelangganNama, setSelectedPelangganNama] = useState("");
   const [isOpenDropdown, setIsOpenDropdown] = useState(false);
+
+  // Ref untuk mendeteksi klik di luar komponen dropdown
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpenDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // Filter pelanggan berdasarkan ketikan pencarian (nama atau alamat)
   const filteredPelanggan = pelanggan.filter((p) =>
@@ -42,7 +57,6 @@ export default function TransaksiForm({ pelanggan }: { pelanggan: any[] }) {
 
     setLoading(true);
     try {
-      // Bungkus data manual ke FormData untuk dikirim ke Server Actions
       const form = new FormData();
       form.append("tanggal", (e.currentTarget.elements.namedItem("tanggal") as HTMLInputElement).value);
       form.append("pelanggan_id", selectedPelangganId);
@@ -85,8 +99,8 @@ export default function TransaksiForm({ pelanggan }: { pelanggan: any[] }) {
             required
           />
 
-          {/* Kolom Pencarian Pelanggan */}
-          <div className="relative">
+          {/* Kolom Pencarian Pelanggan dengan Ref */}
+          <div className="relative" ref={dropdownRef}>
             <input
               type="text"
               placeholder="Cari nama atau alamat pelanggan..."

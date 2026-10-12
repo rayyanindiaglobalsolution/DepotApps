@@ -10,7 +10,8 @@ import {
   FileText, 
   Wallet, 
   MapPin,
-  ClipboardList // Menyertakan icon Absensi Karyawan yang sebelumnya ditambahkan
+  ClipboardList,
+  Package // Icon baru untuk Stok Galon Depot
 } from 'lucide-react';
 
 export function AppSidebar() {
@@ -18,6 +19,7 @@ export function AppSidebar() {
 
   const menuItems = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { label: "Stok Galon Depot", href: "/dashboard/setting-galon", icon: Package }, // Persis di bawah Dashboard
     { label: "Data Pelanggan", href: "/dashboard/pelanggan", icon: Users },
     { label: "Transaksi Harian", href: "/transaksi", icon: ShoppingCart },
     { label: "Laporan Mingguan", href: "/dashboard/laporan", icon: FileText },
@@ -42,7 +44,7 @@ export function AppSidebar() {
               href={item.href}
               className={`flex items-center p-4 rounded-xl transition-all ${
                 isActive 
-                  ? "bg-white/20 text-white font-medium" // Diperbaiki agar menu aktif terlihat lebih kontras di latar gelap
+                  ? "bg-white/20 text-white font-medium"
                   : "hover:bg-white/10 text-gray-300"
               }`}
             >
@@ -55,12 +57,10 @@ export function AppSidebar() {
       
       {/* Area Bagian Bawah (Footer) */}
       <div className="mt-auto flex flex-col">
-        {/* 1. Teks "Powered By" berada di ATAS garis pembatas */}
         <div className="px-6 py-2 text-[10px] text-gray-500 uppercase tracking-widest text-center font-medium">
           Powered By : Kelompok A Capstone Project 88
         </div>
         
-        {/* 2. Garis pembatas (border-t) diletakkan di sini, memisahkan Teks dan Tombol */}
         <div className="p-6 border-t border-white/10">
           <LogoutButton />
         </div>

@@ -18,7 +18,13 @@ export default function SlipGaji() {
 
   if (!data) return <div className="p-10">Memuat slip gaji...</div>;
 
-  const totalDiterima = Number(data.total_akhir || 0) + Number(data.bonus || 0);
+  // Hitung Gaji Pokok murni (total_akhir saat ini dikurangi bonus yang tersimpan)
+  const nominalBonus = Number(data.bonus || 0);
+  const gajiPokokMurni = Number(data.total_akhir || 0) - nominalBonus;
+
+  // Total diterima yang benar adalah Gaji Pokok Murni + Bonus
+  const totalDiterima = gajiPokokMurni + nominalBonus;
+
   const tanggalHariIni = new Date().toLocaleDateString('id-ID', { 
     day: 'numeric', month: 'long', year: 'numeric' 
   });
@@ -53,8 +59,9 @@ export default function SlipGaji() {
                 </div>
             </div>
         </div>
-        <div className="flex justify-between"><span>Gaji Pokok</span><span>Rp {Number(data.total_akhir).toLocaleString()}</span></div>
-        <div className="flex justify-between text-blue-600"><span>Bonus</span><span>Rp {Number(data.bonus).toLocaleString()}</span></div>
+        {/* Tampilkan Gaji Pokok Murni */}
+        <div className="flex justify-between"><span>Gaji Pokok</span><span>Rp {gajiPokokMurni.toLocaleString()}</span></div>
+        <div className="flex justify-between text-blue-600"><span>Bonus</span><span>Rp {nominalBonus.toLocaleString()}</span></div>
         <div className="flex justify-between font-bold text-lg pt-2 border-t mt-2 bg-gray-50 p-2">
             <span>Total Diterima</span>
             <span>Rp {totalDiterima.toLocaleString()}</span>
