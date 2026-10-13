@@ -19,7 +19,7 @@ export default function DashboardPage() {
   const stokDepotDispenser = stats?.stok_depot?.Dispenser || 0;
   const totalSisaDepot = stokDepotAqua + stokDepotKeran + stokDepotDispenser;
 
-  // Total Aset Galon (Galon di Pelanggan + Sisa Galon di Depot)
+  // Total Aset Galon
   const totalAsetGalon = (stats?.stok_di_pelanggan?.total_keseluruhan || 0) + totalSisaDepot;
 
   return (

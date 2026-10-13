@@ -1,6 +1,9 @@
 import prisma from "@/lib/prisma";
 import MapClientWrapper from "@/components/MapClientWrapper";
 
+export const revalidate = 0;
+export const dynamic = 'force-dynamic';
+
 export default async function PetaPelangganPage() {
   const pelanggan = await prisma.pelanggan.findMany({
     orderBy: { id: "desc" },
