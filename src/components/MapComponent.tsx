@@ -94,20 +94,27 @@ function MapController({ geoJsonData, targetCenter, targetZoom }: { geoJsonData:
 }
 
 const getPelangganCoordinates = (p: any): [number, number] | null => {
-  let lat = Number(p.latitude);
-  let lng = Number(p.longitude);
-
-  if ((!lat || !lng || isNaN(lat) || isNaN(lng)) && p.lokasi_maps) {
-    const coords = p.lokasi_maps.split(",");
+  // Cek langsung dari lokasi_maps jika ada
+  if (p.lokasi_maps && typeof p.lokasi_maps === 'string') {
+    // Bersihkan karakter aneh jika ada, lalu split berdasarkan koma
+    const cleanLokasi = p.lokasi_maps.replace(/[^\d.,\-]/g, '');
+    const coords = cleanLokasi.split(",");
     if (coords.length >= 2) {
-      lat = Number(coords[0].trim());
-      lng = Number(coords[1].trim());
+      const lat = parseFloat(coords[0].trim());
+      const lng = parseFloat(coords[1].trim());
+      if (!isNaN(lat) && !isNaN(lng)) {
+        return [lat, lng];
+      }
     }
   }
 
+  // Fallback ke kolom latitude & longitude terpisah jika ada
+  let lat = Number(p.latitude);
+  let lng = Number(p.longitude);
   if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
     return [lat, lng];
   }
+
   return null;
 };
 

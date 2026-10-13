@@ -5,20 +5,20 @@ const path = require('path');
 const prisma = new PrismaClient();
 
 async function main() {
-  // Membaca file CSV dari folder public
   const filePath = path.join(__dirname, 'public', 'pelanggan.csv');
   const fileContent = fs.readFileSync(filePath, 'utf-8');
 
-  // Memecah baris berdasarkan Enter (newline)
   const rows = fileContent.split(/\r?\n/).filter(row => row.trim() !== '');
 
-  console.log(`Memproses ${rows} baris data pelanggan...`);
+  console.log(`Total baris ditemukan di CSV: ${rows.length}. Memulai import...`);
 
-  for (const row of rows) {
-    // Karena pemisahnya titik koma (;) sesuai hasil export Excel Anda
+  let successCount = 0;
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
     const cols = row.split(';');
     
-    if (cols.length < 8) continue; // Lewati jika baris tidak lengkap
+    if (cols.length < 8) continue;
 
     const jenis = cols[0]?.trim() || null;
     const nama = cols[1]?.trim() || null;
@@ -29,22 +29,30 @@ async function main() {
     const saldo_keran = parseInt(cols[6]) || 0;
     const saldo_dispenser = parseInt(cols[7]) || 0;
 
-    // Masukkan ke database menggunakan Prisma
-    await prisma.pelanggan.create({
-      data: {
-        jenis,
-        nama,
-        alamat,
-        wilayah,
-        no_hp,
-        saldo_aqua,
-        saldo_keran,
-        saldo_dispenser,
-      },
-    });
+    try {
+      await prisma.pelanggan.create({
+        data: {
+          jenis,
+          nama,
+          alamat,
+          wilayah,
+          no_hp,
+          saldo_aqua,
+          saldo_keran,
+          saldo_dispenser,
+        },
+      });
+      successCount++;
+      // Menampilkan progress setiap 50 data agar tidak macet di terminal
+      if (successCount % 50 === 0) {
+        console.log(`Berhasil mengimpor ${successCount} data...`);
+      }
+    } catch (err) {
+      console.error(`Gagal pada baris ke-${i + 1} (${nama}):`, err.message);
+    }
   }
 
-  console.log('✅ Berhasil mengimpor semua data pelanggan ke database!');
+  console.log(`✅ Selesai! Berhasil mengimpor total ${successCount} data pelanggan ke database.`);
 }
 
 main()
