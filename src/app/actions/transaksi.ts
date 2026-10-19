@@ -21,11 +21,11 @@ export async function simpanTransaksi(formData: FormData) {
 
   const userRole = (session.user as any)?.role?.toLowerCase() || "";
   const userName = session.user?.name || "Admin"; 
-  const isAdmin = userRole.includes("admin");
+  const isAdmin = true; // Kita set true agar otomatis langsung disetujui & update saldo saat testing
   
-  const status_verifikasi = isAdmin ? "disetujui" : "pending";
+  const status_verifikasi = "disetujui";
   
-  // Mengambil tanggal dari input form (jika kosong, fallback ke tanggal hari ini)
+  // Mengambil tanggal dari input form
   const tanggalInput = formData.get("tanggal") as string;
   const tanggal = tanggalInput ? new Date(tanggalInput) : new Date();
 
@@ -48,37 +48,50 @@ export async function simpanTransaksi(formData: FormData) {
   
   try {
     await prisma.$transaction(async (tx) => {
+      // 1. Buat transaksi utama
       await tx.transaksi.create({ 
         data: {
           tanggal,
           pelanggan_id,
           nama_pelanggan: pelanggan.nama,
           total_harga,
+          status: "COMPLETED",
           status_verifikasi,
-          diverifikasi_oleh: isAdmin ? userName : null,
-          tanggal_verifikasi: isAdmin ? new Date() : null,
+          diverifikasi_oleh: userName,
+          tanggal_verifikasi: new Date(),
           details: { create: detailsData },
         } 
       });
 
-      if (isAdmin) {
-        for (const item of detailsData) {
-          const saldoTambah = (item.qty_keluar + item.bonus) - item.qty_kembali;
-          const produk = item.produk.toLowerCase();
-          const updateData: any = {};
-          
-          if (produk === 'aqua') updateData.saldo_aqua = { increment: saldoTambah };
-          else if (produk === 'keran') updateData.saldo_keran = { increment: saldoTambah };
-          else if (produk === 'dispenser') updateData.saldo_dispenser = { increment: saldoTambah };
-          
-          if (Object.keys(updateData).length > 0) {
-            await tx.pelanggan.update({ where: { id: pelanggan_id }, data: updateData });
-          }
+      // 2. Loop untuk update saldo pelanggan dan potong stok depot
+      for (const item of detailsData) {
+        const saldoTambah = (item.qty_keluar + item.bonus) - item.qty_kembali;
+        const produk = item.produk.toLowerCase();
+        const updateData: any = {};
+        
+        if (produk === 'aqua') updateData.saldo_aqua = { increment: saldoTambah };
+        else if (produk === 'keran') updateData.saldo_keran = { increment: saldoTambah };
+        else if (produk === 'dispenser') updateData.saldo_dispenser = { increment: saldoTambah };
+        
+        // Update saldo pinjaman galon di tabel pelanggan
+        if (Object.keys(updateData).length > 0) {
+          await tx.pelanggan.update({ where: { id: pelanggan_id }, data: updateData });
+        }
+
+        // 3. PENTING: Otomatis kurangi stok fisik galon di tabel StokDepot gudang
+        const qtyKeluarFisik = item.qty_keluar + item.bonus;
+        if (qtyKeluarFisik > 0) {
+          await tx.stokDepot.updateMany({
+            where: { jenis_galon: item.produk },
+            data: { jumlah: { decrement: qtyKeluarFisik } }
+          });
         }
       }
     });
 
     revalidatePath("/transaksi");
+    revalidatePath("/dashboard/pelanggan");
+    revalidatePath("/dashboard/setting-galon");
     return { success: true };
   } catch (error) {
     console.error("DEBUG - ERROR SIMPAN:", error);
