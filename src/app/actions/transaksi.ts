@@ -19,10 +19,7 @@ export async function simpanTransaksi(formData: FormData) {
 
   if (!pelanggan) return { success: false, error: "Pelanggan tidak ditemukan." };
 
-  const userRole = (session.user as any)?.role?.toLowerCase() || "";
   const userName = session.user?.name || "Admin"; 
-  const isAdmin = true; // Kita set true agar otomatis langsung disetujui & update saldo saat testing
-  
   const status_verifikasi = "disetujui";
   
   // Mengambil tanggal dari input form
@@ -82,7 +79,7 @@ export async function simpanTransaksi(formData: FormData) {
         const qtyKeluarFisik = item.qty_keluar + item.bonus;
         if (qtyKeluarFisik > 0) {
           await tx.stokDepot.updateMany({
-            where: { jenis_galon: item.produk },
+            where: { jenis_galon: item.produk || "" },
             data: { jumlah: { decrement: qtyKeluarFisik } }
           });
         }
@@ -117,8 +114,8 @@ export async function verifikasiTransaksi(id: number) {
       });
 
       if (!transaksi || (transaksi.status_verifikasi?.toLowerCase() !== 'pending' && transaksi.status !== 'PENDING_VERIFIKASI')) {
-  throw new Error("Transaksi sudah diproses atau tidak valid.");
-}
+        throw new Error("Transaksi sudah diproses atau tidak valid.");
+      }
 
       for (const item of transaksi.details) {
         const qtyKeluar = item.qty_keluar ?? 0;
@@ -134,11 +131,11 @@ export async function verifikasiTransaksi(id: number) {
         else if (produk === 'dispenser') updateData.saldo_dispenser = { increment: saldoTambah };
 
         if (Object.keys(updateData).length > 0 && transaksi.pelanggan_id) {
-        await tx.pelanggan.update({
-          where: { id: Number(transaksi.pelanggan_id) },
-          data: updateData
-  });
-}
+          await tx.pelanggan.update({
+            where: { id: Number(transaksi.pelanggan_id) },
+            data: updateData
+          });
+        }
       }
 
       await tx.transaksi.update({
@@ -167,8 +164,11 @@ export async function koreksiTransaksi(id: string, formData: FormData) {
   const session = await getServerSession(authOptions);
   if (!session) return { success: false, error: "Tidak diizinkan." };
 
+  const userName = session.user?.name || "Admin";
+
   try {
     await prisma.$transaction(async (tx) => {
+      // 1. Ambil data transaksi lama beserta detailnya
       const oldTransaksi = await tx.transaksi.findUnique({
         where: { id: String(id) },
         include: { details: true }
@@ -176,31 +176,42 @@ export async function koreksiTransaksi(id: string, formData: FormData) {
 
       if (!oldTransaksi) throw new Error("Transaksi tidak ditemukan.");
 
-      if (oldTransaksi.status_verifikasi === 'disetujui') {
-        for (const item of oldTransaksi.details) {
-          const qtyKeluar = item.qty_keluar ?? 0;
-          const qtyBonus = item.bonus ?? 0;
-          const qtyKembali = item.qty_kembali ?? 0;
-          
-          const saldoKurang = (qtyKeluar + qtyBonus) - qtyKembali;
-          const produk = (item.produk || "").toLowerCase();
-          const updateData: any = {};
+      // 2. BATALKAN/KUTANGKAN DULU dampak saldo & stok dari transaksi LAMA (Rollback)
+      for (const item of oldTransaksi.details) {
+        const qtyKeluar = item.qty_keluar ?? 0;
+        const qtyBonus = item.bonus ?? 0;
+        const qtyKembali = item.qty_kembali ?? 0;
+        
+        const saldoLama = (qtyKeluar + qtyBonus) - qtyKembali;
+        const produk = (item.produk || "").toLowerCase();
+        const updateDataRollback: any = {};
 
-          if (produk === 'aqua') updateData.saldo_aqua = { decrement: saldoKurang };
-          else if (produk === 'keran') updateData.saldo_keran = { decrement: saldoKurang };
-          else if (produk === 'dispenser') updateData.saldo_dispenser = { decrement: saldoKurang };
+        if (produk === 'aqua') updateDataRollback.saldo_aqua = { decrement: saldoLama };
+        else if (produk === 'keran') updateDataRollback.saldo_keran = { decrement: saldoLama };
+        else if (produk === 'dispenser') updateDataRollback.saldo_dispenser = { decrement: saldoLama };
 
-          if (Object.keys(updateData).length > 0 && oldTransaksi.pelanggan_id) {
-            await tx.pelanggan.update({ 
-              where: { id: oldTransaksi.pelanggan_id }, 
-              data: updateData 
-            });
-          }
+        // Kembalikan saldo pelanggan
+        if (Object.keys(updateDataRollback).length > 0 && oldTransaksi.pelanggan_id) {
+          await tx.pelanggan.update({ 
+            where: { id: oldTransaksi.pelanggan_id }, 
+            data: updateDataRollback 
+          });
+        }
+
+        // Kembalikan stok depot fisik
+        const qtyKeluarFisikLama = qtyKeluar + qtyBonus;
+        if (qtyKeluarFisikLama > 0) {
+          await tx.stokDepot.updateMany({
+            where: { jenis_galon: item.produk || "" },
+            data: { jumlah: { increment: qtyKeluarFisikLama } }
+          });
         }
       }
 
+      // 3. Hapus detail transaksi lama
       await tx.detail_transaksi.deleteMany({ where: { transaksi_id: id } });
 
+      // 4. Hitung data transaksi BARU hasil revisi
       const produkList = [
         { nama: "Aqua", harga: 6000, key: "aqua" },
         { nama: "Keran", harga: 7000, key: "keran" },
@@ -208,68 +219,94 @@ export async function koreksiTransaksi(id: string, formData: FormData) {
       ];
 
       let total_harga = 0;
-  const detailsData = produkList.map((p) => {
-    const keluar = parseInt(formData.get(`${p.key}_keluar`) as string || "0");
-    const kembali = parseInt(formData.get(`${p.key}_kembali`) as string || "0");
-    const bonus = parseInt(formData.get(`${p.key}_bonus`) as string || "0");
-    
-    // RUMUS HARGA: Konsisten hanya dari qty_keluar * harga
-    const subtotal = keluar * p.harga; 
-    total_harga += subtotal;
+      const detailsDataNew = produkList.map((p) => {
+        const keluar = parseInt(formData.get(`${p.key}_keluar`) as string || "0");
+        const kembali = parseInt(formData.get(`${p.key}_kembali`) as string || "0");
+        const bonus = parseInt(formData.get(`${p.key}_bonus`) as string || "0");
+        const subtotal = keluar * p.harga; 
+        total_harga += subtotal;
 
-    return { 
-      produk: p.nama, 
-      qty_keluar: keluar, 
-      qty_kembali: kembali, 
-      bonus: bonus, 
-      harga: p.harga, 
-      subtotal: subtotal 
-    };
-  });
+        return { 
+          produk: p.nama, 
+          qty_keluar: keluar, 
+          qty_kembali: kembali, 
+          bonus: bonus, 
+          harga: p.harga, 
+          subtotal: subtotal 
+        };
+      });
 
+      // 5. TERAPKAN dampak saldo & stok dari data transaksi BARU
+      for (const item of detailsDataNew) {
+        const saldoBaru = (item.qty_keluar + item.bonus) - item.qty_kembali;
+        const produk = item.produk.toLowerCase();
+        const updateDataNew: any = {};
+
+        if (produk === 'aqua') updateDataNew.saldo_aqua = { increment: saldoBaru };
+        else if (produk === 'keran') updateDataNew.saldo_keran = { increment: saldoBaru };
+        else if (produk === 'dispenser') updateDataNew.saldo_dispenser = { increment: saldoBaru };
+
+        // Apply saldo pelanggan baru
+        if (Object.keys(updateDataNew).length > 0 && oldTransaksi.pelanggan_id) {
+          await tx.pelanggan.update({ 
+            where: { id: oldTransaksi.pelanggan_id }, 
+            data: updateDataNew 
+          });
+        }
+
+        // Apply potong stok depot baru
+        const qtyKeluarFisikBaru = item.qty_keluar + item.bonus;
+        if (qtyKeluarFisikBaru > 0) {
+          await tx.stokDepot.updateMany({
+            where: { jenis_galon: item.produk || "" },
+            data: { jumlah: { decrement: qtyKeluarFisikBaru } }
+          });
+        }
+      }
+
+      // 6. Update data transaksi utama tetap disetujui (COMPLETED)
       await tx.transaksi.update({
         where: { id: String(id) },
         data: {
           total_harga,
-          status_verifikasi: "pending",
-          diverifikasi_oleh: null,
-          tanggal_verifikasi: null,
-          details: { create: detailsData }
+          status: "COMPLETED",
+          status_verifikasi: "disetujui",
+          diverifikasi_oleh: userName,
+          tanggal_verifikasi: new Date(),
+          details: { create: detailsDataNew }
         }
       });
     });
 
     revalidatePath("/transaksi");
+    revalidatePath("/dashboard/pelanggan");
+    revalidatePath("/dashboard/setting-galon");
     return { success: true };
   } catch (error) {
     console.error("DEBUG - ERROR KOREKSI:", error);
-    return { success: false, error: "Gagal menyimpan perubahan." };
+    return { success: false, error: "Gagal menyimpan perubahan koreksi." };
   }
 }
 
-// --- TAMBAHKAN FUNGSI REKAP TRANSAKSI DI BAWAH FILE INI ---
+// --- FUNGSI REKAP TRANSAKSI ---
 export async function getRekapTransaksi(request: Request) {
   const { searchParams } = new URL(request.url);
   const startDate = searchParams.get('startDate');
   const endDate = searchParams.get('endDate');
 
-  // Pengecekan sesi sengaja dinonaktifkan untuk testing Android
   try {
     console.log("--- Sedang mengambil data rekap transaksi (TANPA SESI) ---");
 
-    // Membuat objek filter dinamis
     const whereClause: any = { status: 'COMPLETED' };
 
-    // Jika parameter tanggal ada, tambahkan ke dalam filter
     if (startDate && endDate) {
       whereClause.tanggal = {
-        gte: new Date(startDate), // Mengambil data mulai dari startDate
-        lte: new Date(endDate)    // Mengambil data sampai dengan endDate
+        gte: new Date(startDate),
+        lte: new Date(endDate)
       };
       console.log(`Filter aktif: ${startDate} sampai ${endDate}`);
     }
 
-    // Mengambil data dengan filter yang sudah disiapkan
     const data = await prisma.transaksi.findMany({
       where: whereClause,
       include: { 
@@ -285,7 +322,6 @@ export async function getRekapTransaksi(request: Request) {
     };
 
   } catch (error: any) {
-    // Logging detail ke terminal VS Code agar mudah dilacak
     console.error("!!! ERROR CRITICAL DI SERVER !!!");
     console.error("Message:", error.message);
     
