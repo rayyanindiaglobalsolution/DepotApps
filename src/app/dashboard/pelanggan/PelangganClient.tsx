@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import DeleteButton from "@/components/DeleteButton";
-import { MapPin, Search, ChevronLeft, ChevronRight, Filter } from "lucide-react";
+import { MapPin, Search, ChevronLeft, ChevronRight, Filter, Printer } from "lucide-react";
 
 export default function PelangganClient({ initialPelanggan }: { initialPelanggan: any[] }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -74,9 +74,19 @@ export default function PelangganClient({ initialPelanggan }: { initialPelanggan
     setCurrentPage(1);
   };
 
+  // Fungsi untuk membuka halaman cetak khusus di tab baru
+  const handlePrint = () => {
+    const params = new URLSearchParams({
+      search: searchQuery,
+      wilayah: selectedWilayah,
+      jenis: selectedJenis,
+    });
+    window.open(`/dashboard/pelanggan/cetak?${params.toString()}`, "_blank");
+  };
+
   return (
     <div>
-      {/* Kolom Pencarian & Filter Dropdown (Wilayah & Jenis) */}
+      {/* Kolom Pencarian & Filter Dropdown (Wilayah & Jenis) serta Tombol Cetak */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="relative flex-1 max-w-md">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
@@ -128,6 +138,15 @@ export default function PelangganClient({ initialPelanggan }: { initialPelanggan
             ))}
           </select>
         </div>
+
+        {/* Tombol Cetak Dokumen */}
+        <button
+          onClick={handlePrint}
+          className="flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-sm transition cursor-pointer"
+        >
+          <Printer size={18} />
+          Cetak Data
+        </button>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -142,8 +161,8 @@ export default function PelangganClient({ initialPelanggan }: { initialPelanggan
                 <th className="p-4">Wilayah</th>
                 <th className="p-4">No HP</th>
                 <th className="p-4">Saldo</th>
-                <th className="p-4">Digitasi</th>
-                <th className="p-4">Aksi</th>
+                <th className="p-4 print:hidden">Digitasi</th>
+                <th className="p-4 print:hidden">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -167,7 +186,7 @@ export default function PelangganClient({ initialPelanggan }: { initialPelanggan
                         <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">D:{p.saldo_dispenser}</span>
                       </div>
                     </td>
-                    <td className="p-4">
+                    <td className="p-4 print:hidden">
                       {p.lokasi_maps ? (
                         <a 
                           href={`https://www.google.com/maps/search/?api=1&query=${p.lokasi_maps}`} 
@@ -185,7 +204,7 @@ export default function PelangganClient({ initialPelanggan }: { initialPelanggan
                         </div>
                       )}
                     </td>
-                    <td className="p-4">
+                    <td className="p-4 print:hidden">
                       <div className="flex gap-2">
                         <Link 
                           href={`/dashboard/pelanggan/edit/${p.id}`} 

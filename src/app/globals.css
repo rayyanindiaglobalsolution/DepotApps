@@ -16,24 +16,40 @@
   }
 }
 
-/* Pengaturan khusus untuk Cetak PDF */
+/* Pengaturan khusus untuk Cetak PDF / Print */
 @media print {
-  /* Menyembunyikan form filter dan form input */
-  form { 
+  /* Mengatur margin kertas agar area cetak lebih luas di mode Portrait */
+  @page {
+    size: portrait;
+    margin: 8mm;
+  }
+
+  /* 1. Menyembunyikan sidebar, navigasi, form, tombol, input, dan baris filter */
+  aside, 
+  nav, 
+  form, 
+  button, 
+  input, 
+  select,
+  .flex.flex-col.sm\:flex-row { 
     display: none !important; 
   }
   
-  /* Menyembunyikan tombol cetak */
-  button { 
-    display: none !important; 
+  /* 2. Menyembunyikan kolom 'Aksi' (kolom terakhir) pada tabel */
+  th:last-child, 
+  td:last-child {
+    display: none !important;
   }
   
-  /* Membersihkan background dan shadow untuk hasil cetak yang bersih */
+  /* 3. Membersihkan background dan shadow */
   body { 
     background: white !important; 
+    color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
   
-  .bg-gray-50\/50 { 
+  .bg-white, .bg-blue-50, .bg-gray-50\/50 { 
     background: white !important; 
   }
   
@@ -42,8 +58,38 @@
     box-shadow: none !important; 
   }
   
-  /* Memastikan teks tetap terbaca hitam di kertas */
+  /* 4. MEMPERKETAT UKURAN TABEL AGAR MUAT SEMPURNA DI PORTRAIT */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 9px !important; /* Ukuran font diperkecil agar semua kolom muat */
+  }
+
+  th, td {
+    border-bottom: 1px solid #cbd5e1 !important;
+    color: #000000 !important;
+    padding: 4px 5px !important; /* Padding sangat rapat agar hemat tempat */
+    word-break: break-word !important;
+  }
+
+  th {
+    background-color: #e2e8f0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Penyesuaian badge saldo galon agar compact */
+  td span[class*="bg-"] {
+    background-color: #f1f5f9 !important;
+    color: #000000 !important;
+    border: 1px solid #94a3b8 !important;
+    padding: 1px 3px !important;
+    font-size: 8px !important;
+    font-weight: bold !important;
+    display: inline-block !important;
+  }
+
   .text-gray-500, .text-gray-600 {
-    color: #333333 !important;
+    color: #1e293b !important;
   }
 }
